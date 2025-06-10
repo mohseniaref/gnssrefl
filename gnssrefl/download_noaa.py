@@ -107,7 +107,7 @@ def download_noaa(station: str, date1: str, date2: str, output: str = None, plt:
     metadata = True
     if (deltad) > 31:
         tt,obstimes,slevel = multimonthdownload(station,datum,fout,year1,year2,month1,month2,csv)
-        noaa_name = station # this is not hte right one ... but 
+        noaa_name = station # this is not the right one ... but
     else:
         tt = []; slevel = []; obstimes = []
         # 'data' are stored in the dictionary data

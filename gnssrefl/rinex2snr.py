@@ -884,7 +884,7 @@ def satorb_prop(week, secweek, prn, rrec0, closest_ephem):
     Calculates and returns geometric range (in metres) given
     time (week and sec of week), prn, receiver coordinates (cartesian, meters)
     this assumes someone was nice enough to send you the closest ephemeris
-    returns the satellite coordinates as well, so you can use htem
+    returns the satellite coordinates as well, so you can use them
     in the A matrix
 
     Parameters

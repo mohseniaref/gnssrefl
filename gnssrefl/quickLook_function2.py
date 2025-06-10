@@ -202,7 +202,7 @@ def quickLook_function(station, year, doy, snr_type,f,e1,e2,minH,maxH,reqAmp,pel
 
         allpoints = 0
 
-        # keep track of the maximum amplitude for each track in each quadrant so you can have them be hte same
+        # keep track of the maximum amplitude for each track in each quadrant so you can have them be the same
         axisSize =np.empty(shape=[0, 2])
 
         if (satsel == None):

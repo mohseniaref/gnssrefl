@@ -215,7 +215,7 @@ def vwc(station: str, year: int, year_end: int = None, fr: int = 20, plt: bool =
 
 
     # this is the number of points for a given satellite track
-    # just reassigning hte variable name
+    # just reassigning the variable name
     reqNumpts = min_req_pts_track
 
     # KL disclosure

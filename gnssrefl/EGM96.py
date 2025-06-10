@@ -3,12 +3,12 @@ from scipy.interpolate import interp2d, RectBivariateSpline
 import os
 
 class EGM96geoid:
-    """ Class for EGM96 geoid corrections
+    """Class for EGM96 geoid corrections.
 
-    :example:
-
-    >>> egm = EGM06geoid()
-    >>> egm.heights(lat=10, lon=30)
+    Example
+    -------
+    >>> egm = EGM96geoid()
+    >>> egm.height(lat=10, lon=30)
     -5.32
     """
 

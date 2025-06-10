@@ -157,7 +157,7 @@ def writeout_azim(station, outputfile,usegps,snowAccum):
     fout.write("{0:s}  \n".format(line2))
     fout.write("{0:s}  \n".format(line3))
 
-    # first need to make a daily average of results that passed hte azimuth bare soil
+    # first need to make a daily average of results that passed the azimuth bare soil
     # get the year values
     yvals = np.unique(usegps[:,0])
     snow = []

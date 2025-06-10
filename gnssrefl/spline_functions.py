@@ -1617,7 +1617,7 @@ def simpleLSP(rhlims, lcar, precision,elvt, sinelvt, snrdt,sat,xsignal,screensta
     px = px[ii]
     pz = pz[ii]
     noise = np.mean(pz)
-    # don't allow max to be at hte beginning of the end
+    # don't allow max to be at the beginning or the end
 
     ij = np.argmax(pz)
     maxF = px[ij]

@@ -1,6 +1,7 @@
 # library for daily_avg_cl.py
 import argparse
 import datetime
+from concurrent.futures import ThreadPoolExecutor
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -14,6 +15,19 @@ from datetime import date
 import gnssrefl.gps as g
 import gnssrefl.sd_libs as sd
 #
+
+def _load_results_file(fname):
+    """Load a single results file safely."""
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            data = np.loadtxt(fname, skiprows=3, comments='%')
+        if data.size == 0:
+            return None
+        return data
+    except Exception:
+        return None
+
 
 def fbias_daily_avg(station):
     """
@@ -53,7 +67,7 @@ def fbias_daily_avg(station):
 # start and end year
     minyear = int(min(tv[:,0])) ; maxyear = int(max(tv[:,0]))
     print('begin/end year: ', minyear, maxyear)
-# list of hte frequencies used
+# list of the frequencies used
 
     flist = np.unique(tvall[:,6])
 
@@ -95,8 +109,8 @@ def fbias_daily_avg(station):
 
 
 
-def readin_plot_daily(station,extension,year1,year2,fr,alldatafile,csvformat,
-        howBig,ReqTracks,azim1,azim2,test,subdir,plot_limits,**kwargs):
+def readin_plot_daily(station, extension, year1, year2, fr, alldatafile, csvformat,
+        howBig, ReqTracks, azim1, azim2, test, subdir, plot_limits, n_jobs=1, **kwargs):
     """
     worker code for daily_avg_cl.py
 
@@ -147,9 +161,12 @@ def readin_plot_daily(station,extension,year1,year2,fr,alldatafile,csvformat,
     subdir : str
         subdirectory for output files
 
-    subdir : bool
+    plot_limits : bool
         whether plot limits for the median filter are shown
 
+    n_jobs : int, optional
+        Number of worker threads used when reading result files. Default is 1
+    
     Returns
     -------
     tv : numpy array
@@ -220,158 +237,41 @@ def readin_plot_daily(station,extension,year1,year2,fr,alldatafile,csvformat,
     test_alltimes = []
     test_good = []
     s1 = time.time()
+    file_info = []
     for yr in year_list:
         direc = xdir + '/' + str(yr) + '/results/' + station + '/' + extension + '/'
-        # counter for the legends
         nle = 0
-        # i understand why python people like this - but then the results are not sorted ...
         if os.path.isdir(direc):
-            all_files = os.listdir(direc)
-            all_files = np.sort(all_files)
-            #print('Number of files in ', yr, len(all_files))
+            all_files = np.sort(os.listdir(direc))
             for f in all_files:
                 fname = direc + f
                 L = len(f)
                 keep_this_one1 = True
                 keep_this_one2 = True
-        # file names must have 7 characters in them ...  and end in txt for that matter
-                if (L == 7):
-                    mjd = g.ydoy2mjd(yr,int(f[0:3]))
-                    if mjd1 is not None:
-                        if (mjd >= mjd1):
-                            keep_this_one1 = True
-                        else:
-                            keep_this_one1 = False
-                    if mjd2 is not None:
-                        if (mjd <= mjd2):
-                            keep_this_one2 = True
-                        else:
-                            keep_this_one2 = False
-                if keep_this_one1 & keep_this_one2:
-                    keepit = True
-                else:
-                    keepit = False
+                if L == 7:
+                    mjd = g.ydoy2mjd(yr, int(f[0:3]))
+                    if mjd1 is not None and mjd < mjd1:
+                        keep_this_one1 = False
+                    if mjd2 is not None and mjd > mjd2:
+                        keep_this_one2 = False
+                keepit = keep_this_one1 and keep_this_one2
+                if (L == 7) and keepit:
+                    NumFiles += 1
+                    file_info.append((yr, f, direc))
 
-                #if not keepit:
-                #    print('thrown out because it was not between your dates',f)
+    file_paths = [os.path.join(d, fn) for (yr, fn, d) in file_info]
+    if n_jobs > 1:
+        with ThreadPoolExecutor(max_workers=n_jobs) as exc:
+            data_list = list(exc.map(_load_results_file, file_paths))
+    else:
+        data_list = [_load_results_file(p) for p in file_paths]
 
-                if (L == 7) & keepit:
-                    NumFiles +=  1
-        # check that it is a file and not a directory and that it has something/anything in it
-                    try:
-                        # trying to turn off the annoying empty file warnings
-                        with warnings.catch_warnings():
-                            warnings.simplefilter("ignore")
-                            a = np.loadtxt(fname,skiprows=3,comments='%')
-                        nr,nc=a.shape
-                        if (nr > 0):
-                            nle = nle + 1
-                            # add the new azimuth constraint here ... 2022sep04
-                            www = (a[:,5] > azim1 ) & (a[:,5] < azim2 )
-                            a = a[www,:]
-
-                            y = a[:,0] +a[:,1]/365.25; rh = a[:,2] ; 
-                            frequency = a[:,10]; azimuth = a[:,5]; sat = a[:,3]; amplitude=a[:,6]
-                            # added utc to the all RH file
-                            utcTime = a[:,4]; 
-                            yr = int(a[0,0]); doy = int(a[0,1])
-                            d = datetime.date(yr,1,1) + datetime.timedelta(doy-1)
-                            peak2noise = a[:,13]
-
-                            medv = np.median(rh)
-                            # 0 means use all frequencies.  otherwise, you can specify 
-                            # this is applying the medial filter
-                            if fr == 0:
-                                cc = (rh < (medv+howBig))  & (rh > (medv-howBig))
-                            else:
-                                cc = (rh < (medv+howBig))  & (rh > (medv-howBig)) & (frequency == fr)
-                            good =rh[cc]; goodT =y[cc]; goodAmp = amplitude[cc]
-                            gazim = azimuth[cc]; gsat = sat[cc]; gamp = amplitude[cc]; gpeak2noise = peak2noise[cc]
-                            gfreq = frequency[cc]
-                            # added 21may14
-                            gutcTime = utcTime[cc]
-
-                            # write out everyting including bad retrievals
-                            dumb= write_out_all(noqc, csvformat, len(rh), yr, doy, d, rh, azimuth, frequency, sat,amplitude,peak2noise,utcTime,[])
-                            
-                            # tvall no longer being used as a variable but still sending it to the function.
-                            # unfortunately the info is not sorted - because of the way the directory listing works....
-                            NG = len(good)
-
-        # only save if there are some minimal number of values
-                            if (len(good) >= ReqTracks):
-
-                                # write out the individual tracks that made your met your QC metrics ...
-                                tvall = write_out_all(allrh, csvformat, NG, yr, doy, d, good, gazim, gfreq, gsat,gamp,gpeak2noise,gutcTime,tvall)
-
-                                rh = good
-                                # this is the plot with all the data -not the daily average
-                                alltimes = []
-
-                                # put in the real time (as opposed to just year,month day)
-                                #filler = datetime.datetime(year=yr, month=d.month, day=d.day, hour = hrr, minute=mm, second = ss)
-                                for w in range(0,len(good)):
-                                    hrr = int(np.floor(gutcTime[w])) # 
-                                    mm = int(60*(gutcTime[w] - hrr )); ss = 0
-                                    filler = datetime.datetime(year=yr, month=d.month, day=d.day, hour = hrr, minute=mm, second = ss)
-                                    alltimes.append(filler)
-                                # 
-                                # this probably should not be inside the loop
-                                # maybe this makes it slow? will try accumulating it all and plot outside the loop
-                                #test_alltimes.append(alltimes)
-                                #test_good.append(good)
-
-                                ax.plot(alltimes,good,'b.')
-
-                                # this are stats for the daily averages - is this slowing it down? - apparently not
-                                # turned off for now
-                                if True:
-                                    ijk = (gsat  < 100); 
-                                    ngps = np.append(ngps, len(gsat[ijk]))
-
-                                    ijk = (gsat  > 300);  # beidou
-                                    nbei = np.append(nbei, len(gsat[ijk]))
-   
-                                    ijk = (gsat > 100) * (gsat < 200);  # glonass
-                                    nglo = np.append(nglo, len(gsat[ijk]))
-
-                                    ijk = (gsat > 200) * (gsat < 300); # galileo
-                                    ngal = np.append(ngal, len(gsat[ijk]))
-
-                                obstimes.append(datetime.datetime(year=yr, month=d.month, day=d.day, hour=12, minute=0, second=0))
-
-                                medRH.append(medv)
-                                #medRH =np.append(medRH, medv)
-                                # store the meanRH after the outliers are removed using simple median filter
-                                meanRHtoday = np.mean(good)
-
-                                stdRHtoday = np.std(good)
-                                #meanRH =np.append(meanRH, meanRHtoday)
-                                #
-                                # july 7, 2022
-                                meanRH.append(meanRHtoday)
-                                #meanAmp = np.append(meanAmp, np.mean(goodAmp))
-                                # updated this to include mean amplitude 2021 november 8
-                                meanAmp.append(np.mean(goodAmp))
-                                newl = [yr, doy, meanRHtoday, len(rh), d.month, d.day, stdRHtoday, np.mean(goodAmp)]
-                                # a new variable is not really needed - but I did not want to oerwrite working code
-                                newl_plus_median = [yr, doy, meanRHtoday, len(rh), d.month, d.day, stdRHtoday, np.mean(goodAmp),medv]
-
-                                # maybe this is slow??
-                                #tv = np.append(tv, [newl],axis=0)
-                                #tv_median = np.append(tv_median, [newl_plus_median],axis=0)
-                                # see if this works
-                                tv_list.append(newl)
-                                tv_median_list.append(newl_plus_median)
-
-                                k += 1
-                            else:
-                                NotEnough = NotEnough + 1
-                    except:
-                        okok = 1;
-            #ax.plot(test_alltimes,test_good,'b.')
-        else:
-            abc = 0; # dummy line
+    for (yr, f, direc), a in zip(file_info, data_list):
+        if a is None:
+            continue
+        nle = nle + 1
+        www = (a[:,5] > azim1 ) & (a[:,5] < azim2 )
+        a = a[www,:]
     #meanRH = np.asarray(meanRH)
 
     s2 = time.time()

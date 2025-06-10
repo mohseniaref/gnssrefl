@@ -170,7 +170,7 @@ def write_subdaily(outfile,station,ntv,csv,extraline,**kwargs):
         rh = ntv[i,2]; UTCtime = ntv[i,4]; 
         dob, year, month, day, hour, minute, second = g.ymd_hhmmss(year,doy,UTCtime,dtime)
         #ctime = g.nicerTime(UTCtime); 
-        # taking hte lazy approach - if someone wants csv write out txt and csv
+        # taking the lazy approach - if someone wants csv write out txt and csv
         if csv:
             if original:
                 fout_csv.write(" {0:4.0f},{1:3.0f},{2:7.3f},{3:3.0f},{4:6.3f},{5:6.2f},{6:6.2f},{7:6.2f},{8:6.2f},{9:4.0f},{10:3.0f},{11:2.0f},{12:8.5f},{13:6.2f},{14:7.2f},{15:12.6f},{16:1.0f},{17:2.0f},{18:2.0f},{19:2.0f},{20:2.0f},{21:2.0f} \n".format(year, doy, rh,ntv[i,3],UTCtime,ntv[i,5],ntv[i,6],ntv[i,7],ntv[i,8], ntv[i,9], ntv[i,10],ntv[i,11], ntv[i,12],ntv[i,13], ntv[i,14], ntv[i,15], ntv[i,16],month,day,hour,minute, int(second)))

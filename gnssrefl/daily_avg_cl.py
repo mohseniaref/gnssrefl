@@ -29,6 +29,7 @@ def parse_arguments():
     parser.add_argument("-plot_limits", default=None, type=str, help="add median value and limits to plot, default is False ")
     parser.add_argument("-date1", default=None, type=str, help="Optional beginning date, yyyymmdd")
     parser.add_argument("-date2", default=None, type=str, help="Optional ending date, yyyymmdd")
+    parser.add_argument("-jobs", default=1, type=int, help="Number of worker threads for reading files")
     args = parser.parse_args().__dict__
 
     # convert all expected boolean inputs from strings to booleans
@@ -42,7 +43,7 @@ def parse_arguments():
 def daily_avg(station: str , medfilter: float, ReqTracks: int, txtfile: str = None, plt: bool = True, 
         extension: str = '', year1: int = None, year2: int = None, fr: int = 0, csv: bool = False, 
         azim1: int = 0, azim2: int = 360, test: bool = False, subdir: str=None,plot_limits: bool=False, 
-              date1: str=None, date2: str=None):
+              date1: str=None, date2: str=None, jobs: int = 1):
     """
     The goal of this code is to consolidate individual RH results into a single file consisting of 
     daily averaged RH without outliers. These daily average values are nominally associated 
@@ -189,6 +190,9 @@ def daily_avg(station: str , medfilter: float, ReqTracks: int, txtfile: str = No
         you only want data ending from this date, format yyyymmdd
         this will supercede year2
 
+    jobs: int, optional
+        number of worker threads used when reading files. Default is 1
+
     """
     # set some defaults so they are easy to find
     if year1 is None:
@@ -266,8 +270,11 @@ def daily_avg(station: str , medfilter: float, ReqTracks: int, txtfile: str = No
             print('Illegal date2. Ignoring and using default year2 ', year2)
             date2 = None
 
-    tv, obstimes = da.readin_plot_daily(station, extension, year1, year2, fr, 
-            alldatafile, csv, medfilter, ReqTracks,azim1,azim2,test,subdir,plot_limits,date1=date1,date2=date2)
+    tv, obstimes = da.readin_plot_daily(
+            station, extension, year1, year2, fr,
+            alldatafile, csv, medfilter, ReqTracks,
+            azim1, azim2, test, subdir, plot_limits,
+            jobs, date1=date1, date2=date2)
 
     # default is to show the plots
     nr,nc = tv.shape

@@ -1218,7 +1218,7 @@ def myscan(rinexfile):
 #    typesObs = header['# / TYPES OF OBSERV'].split()
     aa=header['# / TYPES OF OBSERV']
     types = aa[1:] # this means from element 1 to the end
-    # these are from the pyrinex verison of hte code
+    # these are from the pyrinex version of the code
     header['# / TYPES OF OBSERV'][0] = int(header['# / TYPES OF OBSERV'][0])
     header['INTERVAL'] = float(header['INTERVAL'])
     # need to get approx position of the receiver
