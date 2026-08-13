@@ -18,6 +18,10 @@ If not wanted, it should be set to the empty list, []. Otherwise, don't add it a
 Updated unsupported scripts for downloading veg metrics, download_teqc.py.  Also veg_multiyr,
 but that one needs more work.
 
+Updates to rinex2snr now allow input of [RINEX 3 files that live in your disk](https://github.com/kristinemlarson/gnssrefl/pull/424).
+
+For that reason, rinex3_snr no longer exists.
+
 ## 4.2.0
 
 July 28, 2026

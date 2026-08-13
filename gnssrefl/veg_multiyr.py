@@ -18,9 +18,39 @@ import wget
 
 import gnssrefl.gps as g
 import gnssrefl.computemp1mp2 as veg
+import gnssrefl.sd_libs as sd
+
+def ydoy2obstimes(year,doy):
+    """
+    Parameters
+    ----------
+    year: numpy array
+        years
+    doy : numpy array
+        day of years
+
+    REturns
+    -------
+    obstimes: numpy array
+        obs times, nice for plotting
+
+    """
+    N = len(year)
+    mjd = []
+    for i in range(0,N):
+        d1 = int(year[i])
+        d2 = int(doy[i]) 
+        m = g.ydoy2mjd(d1, d2)
+        mjd.append(m) 
+
+    mjd = np.asarray(mjd)
+    obstimes = sd.mjd_to_obstimes(mjd)
+
+    return obstimes
+
 def writeout_one_year(station, year,rcvtype):
     """
-    if file exists, return values. otherwise write out a file
+    ief file exists, return values. otherwise write out a file
     """
     fileout = vegoutfile(station, year)
     if os.path.isfile(fileout):
@@ -45,8 +75,16 @@ def writeout_one_year(station, year,rcvtype):
             vegid.write("{0:4.0f} {1:3.0f} {2:8.4f} {3:8.4f}  {4:s} {5:2.0f} {6:2.0f} \n".format(year,d, mp1rms, float(mp1), rcvinfile,mm,dd))
 
     vegid.close()
-    data = np.loadtxt(fileout,usecols=(0,1,2,3),comments='%')
-    vegreceiver = np.genfromtxt(fileout, usecols=4,dtype='str')
+
+    print(year,k)
+    if k == 0:
+        print('No files were found on disk for this year ', year)
+        if os.path.isfile(fileout):
+            subprocess.call(['rm', fileout]);
+        data = []; vegreceiver = []
+    else:
+        data = np.loadtxt(fileout,usecols=(0,1,2,3),comments='%')
+        vegreceiver = np.genfromtxt(fileout, usecols=4,dtype='str')
 
     return k , data, vegreceiver
 
@@ -64,7 +102,7 @@ def in_winter(day, winter1, winter2):
     Returns
     -------
     bool
-        True if doy is in winter, False if not considered "winter".
+         True if doy is in winter, False if not considered "winter".
     """
     inwinter = False
     if (day < winter1) or (day > winter2):
@@ -149,9 +187,10 @@ def main():
     rout = np.empty(shape=[0, 1])
     for year in range(y1,y2+1):
         nobs,data,rcvout = writeout_one_year(station, year,rcvtype)
-        dataout = np.vstack((dataout,data))
-        v = np.reshape(rcvout, (len(rcvout), 1))
-        rout = np.vstack((rout, v))
+        if len(data) > 0:
+            dataout = np.vstack((dataout,data))
+            v = np.reshape(rcvout, (len(rcvout), 1))
+            rout = np.vstack((rout, v))
 
         k = k + nobs
 
@@ -168,25 +207,34 @@ def main():
     print(len(dataout), ' daily observations and ', N, ' receiver types')
 
     if k > 0:
-        plt.figure()
+        fig,ax=plt.subplots()
         for i in range(0,N):
             rname = receiver_types[i]
             r1 = dataout[np.where(rout==rname)[0]]
             outx = r1[:,0] + r1[:,1]/365.25
             jj = (r1[:,2] > 0)
             kk = (r1[:,3] > 0)
+            # year values
+            aa = np.append( r1[jj,0], r1[kk,0])
+            # doy values
+            bb = np.append( r1[jj,1], r1[kk,1])
+            obstimes = ydoy2obstimes(aa,bb)
+
             xout = np.append(outx[jj],outx[kk])
             yout = np.append( -r1[jj,2], -r1[kk,3])
-            plt.plot(xout, yout, '.',label=rname)
+            plt.plot(obstimes, yout, '.',label=rname)
+            #plt.plot(xout, yout, '.',label=rname)
 
     # since we have a legend we don't want to plot it when it is empty
 
         plt.title('L1 Multipath Statistics for ' + station.upper() )
         plt.grid()
+  
         plt.legend(loc="upper left")
         plt.ylabel('-L1 rms (m)')
         if len(ylimits) == 2:
             plt.ylim((ylimits))
+        fig.autofmt_xdate()
         plt.show()
 
 

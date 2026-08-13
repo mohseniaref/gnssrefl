@@ -64,7 +64,8 @@ def mpfile_unavco(station, year, doy):
     if os.path.isfile(ddir + fname):
         print('teqc log already exists', ddir+fname)
     elif os.path.isfile(ddir + fname + '.gz'):
-        print('gzipped teqc log already exists', ddir+fname + '.gz')
+        print('gzipped teqc log already exists (will ungzip) ', ddir+fname + '.gz')
+        subprocess.call(['gunzip', ddir + fname + '.gz'])
     else:
         print('Looking for: ', url)
         foundit,fname = kelly.the_kelly_simple_way(url,fname)
