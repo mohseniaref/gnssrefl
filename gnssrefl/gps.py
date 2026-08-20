@@ -4012,12 +4012,8 @@ def read_sp3file(file_path):
     respectively.  all other satellites are ignored
 
     """
-    ignorePoint = False
-    max_sat = 150 # not used
     # store as satNu, week, sec of week , x, y, and z?
     rows = []
-    count = -1
-    firstEpochFound = False
 
     f = open(file_path, 'r')
     for line in f.readlines():
@@ -4026,16 +4022,7 @@ def read_sp3file(file_path):
             year,month,day,hour,minute,second = line.split()[1:]
             wk,swk = kgpsweek(int(year), int(month), int(day), int(hour), int(minute), float(second))
             wk = int(wk) ; swk = float(swk)
-            if (not firstEpochFound):
-                firstWeek = wk
-                firstEpochFound = True
-                #print('first GPS Week and Seconds in the file', firstWeek, swk)
-            count += 1
-            if (wk != firstWeek):
-                #print('this is a problem - this code should not be used with files that crossover GPS weeks ')
-                #print('JAXA orbits have this extra point, which is going to be thrown out')
-                ignorePoint = True
-        if (line[0] == 'P') and (not ignorePoint):
+        if line[0] == 'P':
             co = line[1]
             if co == 'J':
                 continue  # skip QZSS; collides with BeiDou in findConstell
