@@ -37,6 +37,29 @@ def elev_limits(snroption):
     return emin, emax
 
 
+def compute_continuous_seconds(week, sow, week0):
+    """
+    Puts GPS times on a single timescale anchored to the start of week0, so that
+    a GPS week rollover part way through a multi-day orbit file does not send the
+    seconds back to zero.
+
+    Parameters
+    ----------
+    week : int or ndarray
+        GPS week
+    sow : float or ndarray
+        seconds of the GPS week
+    week0 : int
+        GPS week the timescale is anchored to
+
+    Returns
+    -------
+    seconds : float or ndarray
+        seconds since the start of week0
+    """
+    return (week - week0)*604800.0 + sow
+
+
 def propagate_and_azel_sp3(iX, iY, iZ, t, recv, up, East, North, oE, clight):
     """
     Vectorized SP3 orbit propagation with light-time iteration, then azimuth/elevation.

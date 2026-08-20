@@ -9,7 +9,7 @@ import tempfile
 from scipy.interpolate import interp1d, CubicSpline
 
 import gnssrefl.gps as g
-from gnssrefl.snrfile_functions import constants, elev_limits as snr_elev_limits, propagate_and_azel_sp3
+from gnssrefl.snrfile_functions import constants, elev_limits as snr_elev_limits, propagate_and_azel_sp3, compute_continuous_seconds
 
 def nmea_apriori_coords(station,llh,sp3):
     """
@@ -417,17 +417,21 @@ def nmea_sp3_azel(recv, year, month, day, tod, prn, s1, s2, s5, s6, s7, s8,
     up, East, North = g.up(lat, lon)
 
     gweek0, gpssec0 = g.kgpsweek(year, month, day, 0, 0, 0)
-    obs_sow = gpssec0 + tod
 
     sp3 = g.read_sp3file(orbfile)
     if sp3.size == 0:
         print('SP3 file is empty or unreadable'); return
 
+    # orbits and observations share a timescale anchored to the first week in the sp3 file
+    week0 = sp3[0, 1]
+    sp3_t = compute_continuous_seconds(sp3[:, 1], sp3[:, 2], week0)
+    obs_t = compute_continuous_seconds(gweek0, gpssec0 + tod, week0)
+
     # pre-index SP3 data by satellite number
     sp3_index = {}
     for sat_id in np.unique(sp3[:, 0]).astype(int):
         m = sp3[:, 0] == sat_id
-        sp3_index[sat_id] = (sp3[m, 2], sp3[m, 3], sp3[m, 4], sp3[m, 5])
+        sp3_index[sat_id] = (sp3_t[m], sp3[m, 3], sp3[m, 4], sp3[m, 5])
 
     oE = constants.omegaEarth
     clight = constants.c
@@ -447,7 +451,7 @@ def nmea_sp3_azel(recv, year, month, day, tod, prn, s1, s2, s5, s6, s7, s8,
         iZ = CubicSpline(sp3_sec, z, extrapolate=True)
 
         mask = (prn == sat_id)
-        t_sat = obs_sow[mask]
+        t_sat = obs_t[mask]
         s1_sat = s1[mask]; s2_sat = s2[mask]; s5_sat = s5[mask]
         s6_sat = s6[mask]; s7_sat = s7[mask]; s8_sat = s8[mask]
         tod_sat = tod[mask]

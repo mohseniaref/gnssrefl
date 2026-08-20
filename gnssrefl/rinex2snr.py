@@ -19,7 +19,7 @@ import gnssrefl.rinpy as rinpy
 import gnssrefl.karnak_libraries as k
 import gnssrefl.highrate as ch
 
-from gnssrefl.snrfile_functions import constants, elev_limits, propagate_and_azel_sp3
+from gnssrefl.snrfile_functions import constants, elev_limits, propagate_and_azel_sp3, compute_continuous_seconds
 
 #
 #
@@ -1020,11 +1020,16 @@ def write_snr_from_sp3(gpstime,sp3,systemsatlists,obsdata,obstypes,prntoidx,year
     # epoch at the beginning of the day of your RINEX file
     gweek0, gpssec0 = g.kgpsweek(year, month,day,0,0,0 )
 
+    # orbits and observations share a timescale anchored to the first week in the sp3 file
+    week0 = sp3[0, 1]
+    sp3_t = compute_continuous_seconds(sp3[:, 1], sp3[:, 2], week0)
+    tod0 = compute_continuous_seconds(gweek0, gpssec0, week0)
+
     # pre-index SP3 data by satellite number (avoids repeated boolean scans)
     sp3_index = {}
     for sat_id in np.unique(sp3[:, 0]).astype(int):
         m = sp3[:, 0] == sat_id
-        sp3_index[sat_id] = (sp3[m, 2], sp3[m, 3], sp3[m, 4], sp3[m, 5])  # sec, x, y, z
+        sp3_index[sat_id] = (sp3_t[m], sp3[m, 3], sp3[m, 4], sp3[m, 5])  # sec, x, y, z
 
     oE = constants.omegaEarth
     clight = constants.c
@@ -1066,7 +1071,8 @@ def write_snr_from_sp3(gpstime,sp3,systemsatlists,obsdata,obstypes,prntoidx,year
                         if skey in obslist:
                             all_nan = all_nan & np.isnan(obsdata[con][skey][:, prntoidx[con][prn]])
                     not_ij = ~all_nan
-                    Tp = gpstime[not_ij,1] # only use the seconds of the week for now
+                    sow = gpstime[not_ij,1]
+                    Tp = compute_continuous_seconds(gpstime[not_ij,0], sow, week0)
                     s1 = s1[not_ij]; is1 = np.isnan(s1); s1[is1] = 0
                     emp = np.zeros(len(s1),dtype=float)
         # get the rest of the SNR data in a function
@@ -1078,7 +1084,7 @@ def write_snr_from_sp3(gpstime,sp3,systemsatlists,obsdata,obstypes,prntoidx,year
 
                     # --- decimation filter (vectorized) ---
                     if checkD:
-                        dec_mask = (Tp % dec_rate) == 0
+                        dec_mask = (sow % dec_rate) == 0
                     else:
                         dec_mask = np.ones(nepochs, dtype=bool)
 
@@ -1104,7 +1110,7 @@ def write_snr_from_sp3(gpstime,sp3,systemsatlists,obsdata,obstypes,prntoidx,year
                     edot_all = 2.0 * (elv_after - eleA_all[elev_mask])
 
                     # --- accumulate as array block ---
-                    tod_pass = t_all[elev_mask] - gpssec0
+                    tod_pass = t_all[elev_mask] - tod0
                     idx_pass = idx_all[elev_mask]
                     n_pass = len(tod_pass)
                     block = np.empty((n_pass, 12))
