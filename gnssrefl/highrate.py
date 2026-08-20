@@ -127,6 +127,8 @@ def cddis_highrate(station, year, month, day,stream,dec_rate):
     print('That download experience took ', int(s2-s1), ' seconds.')
     print('Attempt to merge the 15 minute files using gfzrnx and move to ', rinexname)
     if (fileF > 0): # files exist
+        if version == 2:
+            g.strip_truncated_epochs(searchpath)
         if (dec_rate == 1):
             subprocess.call([gfzpath,'-finp', searchpath, '-fout', tmpname, '-vo',str(version),'-f','-q'])
         else:

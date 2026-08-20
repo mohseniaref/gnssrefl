@@ -4,6 +4,7 @@ from datetime import date
 from datetime import timedelta
 
 import getpass
+import glob
 import json
 import math
 import os
@@ -4164,6 +4165,7 @@ def big_Disk_work_hard(station,year,month,day,delete_hourly):
         subprocess.call(['rm','-f', rinexfile])
 
     # now merge the hourly files you have 
+    strip_truncated_epochs(searchpath)
     subprocess.call([gexe,'-finp', searchpath, '-fout', rinexfile, '-vo','2','-obs_types', 'S','-f','-q'])
     if os.path.isfile(rinexfile):
         print('file created: ', rinexfile)
@@ -5496,6 +5498,7 @@ def rinex_nrcan_highrate(station, year, month, day):
         rinexname = station + cdoy + '0.' + cyy + 'o'
         print('Attempt to merge the 15 minute files using gfzrnx and move to ', rinexname)
         tmpname = station + cdoy + '0.' + cyy + 'o.tmp'
+        strip_truncated_epochs(searchpath)
         subprocess.call([gfzrnxpath,'-finp', searchpath, '-fout', tmpname, '-vo','2','-f','-q'])
         cm = 'rm ' + station + cdoy + '*o'
         if os.path.isfile(tmpname):
@@ -5806,6 +5809,123 @@ def ga_highrate(station9,year,doy,dec,deleteOld=True):
         searchpath = station9.upper()  + '*' + cyyyy + cdoy + '*crx'
         cm ='rm -f ' + searchpath
         subprocess.call(cm,shell=True)
+    return rinex2, fexist
+
+
+def strip_truncated_epochs(searchpath):
+    """
+    Removes a truncated trailing epoch record from RINEX 2.11 files that are about to
+    be merged. A receiver can cut the final epoch header short. gfzrnx then discards
+    every observation in that file rather than the single bad record, which silently
+    drops the file from the merged output.
+
+    Parameters
+    ----------
+    searchpath : str
+        glob pattern for the RINEX 2.11 files that will be merged
+
+    """
+    for fname in sorted(glob.glob(searchpath)):
+        with open(fname, 'r', errors='replace') as fid:
+            lines = fid.readlines()
+        last = len(lines) - 1
+        while last >= 0 and not lines[last].strip():
+            last = last - 1
+        if last < 0:
+            continue
+        fields = lines[last].split()
+        if len(fields) < 5 or len(fields) >= 8:
+            continue
+        try:
+            yy, month, day, hour, minute = [int(f) for f in fields[0:5]]
+        except ValueError:
+            continue
+        if not (0 <= yy <= 99 and 1 <= month <= 12 and 1 <= day <= 31 and 0 <= hour <= 23 and 0 <= minute <= 59):
+            continue
+        with open(fname, 'w') as fid:
+            fid.writelines(lines[0:last])
+        print('Removed a truncated epoch record from ', fname)
+
+
+def ga_highrate_rinex2(station, year, doy, dec):
+    """
+    Attempts to download and merge highrate RINEX 2.11 files from GA
+
+    Parameters
+    ----------
+    station : str
+        four character station name
+    year : int
+        full year
+    doy : int
+        day of year
+    dec : int
+        decimation value.  1 or 0 means no decimation
+
+    Returns
+    -------
+    rinex2 : str
+        rinex2 filename created by merging the 15 minute files
+    fexist : bool
+        whether a rinex2 file was successfully created
+
+    """
+    station = station[0:4].lower()
+    cyyyy = str(year)
+    cyy = cyyyy[2:4]
+    cdoy = '{:03d}'.format(doy)
+    crnxpath = hatanaka_version()
+    gexe = gfz_version()
+    rinex2 = station + cdoy + '0.' + cyy + 'o'
+    fexist = False
+
+    if not os.path.exists(gexe):
+        print('no gfzrnx executable. exiting.')
+        return rinex2, fexist
+
+    if not os.path.exists(crnxpath):
+        hatanaka_warning()
+        return rinex2, fexist
+
+    print('WARNING: downloading 96 files of high-rate GPS data from Australia takes a long time.')
+    QUERY_PARAMS, headers = k.ga_stuff_highrate(station, year, doy, rinexv=2)
+    API_URL = 'https://data.gnss.ga.gov.au/api/rinexFiles/'
+    request = requests.get(API_URL, QUERY_PARAMS, headers=headers)
+    if request.status_code != 200:
+        print('GA has no high-rate RINEX 2.11 files for this station and day.')
+        return rinex2, fexist
+
+    for query_response_item in json.loads(request.content):
+        file_url = query_response_item['fileLocation']
+        file_name = urlparse(file_url).path.rsplit('/', 1)[1]
+        crnx_name = file_name[:-3]
+        oname = crnx_name[0:-1] + 'o'
+        if os.path.exists(oname):
+            continue
+        if not os.path.exists(crnx_name):
+            print(file_name)
+            g.replace_wget(file_url, file_name)
+            if os.path.exists(file_name):
+                subprocess.call(['gunzip', file_name])
+        if os.path.exists(crnx_name):
+            subprocess.call([crnxpath, crnx_name])
+            subprocess.call(['rm', '-f', crnx_name])
+
+    searchpath = station + cdoy + '*.' + cyy + 'o'
+    tmpname = rinex2 + '.tmp'
+    strip_truncated_epochs(searchpath)
+    print('Attempt to merge the 15 minute files using gfzrnx and move to ', rinex2)
+    if dec > 1:
+        subprocess.call([gexe, '-finp', searchpath, '-fout', tmpname, '-vo', '2', '-sei', 'out', '-smp', str(dec), '-f', '-q'])
+    else:
+        subprocess.call([gexe, '-finp', searchpath, '-fout', tmpname, '-vo', '2', '-f', '-q'])
+
+    if os.path.exists(tmpname):
+        subprocess.call('rm -f ' + searchpath, shell=True)
+        subprocess.call(['mv', tmpname, rinex2])
+        print('File created ', rinex2)
+        fexist = True
+
     return rinex2, fexist
 
 

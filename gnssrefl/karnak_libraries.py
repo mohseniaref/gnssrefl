@@ -725,10 +725,9 @@ def rinex2_highrate(station, year, doy,archive,strip_snr):
             stream = 'R'
             srate = 1 # one second
             ch.cddis_highrate(station, year, month, day,stream,srate)
-    #if not os.path.isfile(rinexfile):
-    #    if not os.path.isfile(rinexfile):
-    #        if (archive == 'ga') or (archive == 'all'):
-    #            g.rinex_ga_highrate(station, year, month, day)
+    if not os.path.isfile(rinexfile):
+        if (archive == 'ga') :
+            g.ga_highrate_rinex2(station, year, doy, 1)
 
     if os.path.isfile(rinexfile):
         foundit = True
